@@ -13,3 +13,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 -Never create branches , worktress , or commit automatically. Only do so when the user expicitly asks for that specific actions in the current request.
 -Leave changes uncommited in the working tree on the current branch and let the user decide when and how to commit.
 
+## Database
+
+- Only apply schema changes with `npm run db:push` (`drizzle-kit push`). Never use migrations: do not run `drizzle-kit generate` or `drizzle-kit migrate`, and do not create or commit a `drizzle/` migrations folder or SQL migration files.
+- This is a development project. There is no backward compatibility and the data is worthless. Prefer data loss: never backfill, migrate, or preserve existing rows, and never spend effort on keeping old data working. Every schema change means a clean slate.
+
