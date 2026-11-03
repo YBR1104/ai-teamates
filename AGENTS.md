@@ -18,6 +18,38 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - Only apply schema changes with `npm run db:push` (`drizzle-kit push`). Never use migrations: do not run `drizzle-kit generate` or `drizzle-kit migrate`, and do not create or commit a `drizzle/` migrations folder or SQL migration files.
 - This is a development project. There is no backward compatibility and the data is worthless. Prefer data loss: never backfill, migrate, or preserve existing rows, and never spend effort on keeping old data working. Every schema change means a clean slate.
 
+## Forms
+
+Reference implementation: `lib/db/schema.ts` (`insertBotSchema`), `actions/bot.ts` (`createBot`), `components/bot-dialog.tsx`. Copy its shape for new forms.
+
+**One schema, validated twice**
+- Derive the insert schema from the Drizzle table with `createInsertSchema` from `drizzle-zod`, and export it from `lib/db/schema.ts` next to the table. Do not hand-write a second zod schema for a table that already exists.
+- Override columns with refinements to add the user-facing rules: `trim()`, `min(1, "message")` and `max(n, "message")`, with a short, human error message.
+- `.omit()` every column the client must not control: `id`, `userId`, third-party ids such as `sandboxId`, and timestamps. Those are set on the server.
+- Export `z.input` and `z.output` types (`BotInput`, `BotValues`). Use the input type for form values and the output type for the submit handler, so `useForm<Input, unknown, Output>`.
+- The same schema runs on the client (`zodResolver`) and again in the server action. Never trust the client validation alone.
+
+**Server actions** (`actions/<name>.ts`, `"use server"`)
+- Take `input: unknown`, not the typed values, and `safeParse` it with the insert schema.
+- Get the owner from Clerk on the server with `const { userId } = await auth.protect()`. Never accept a `userId` from the form or the client.
+- Return a result object (`{ ok: true, ... } | { ok: false, error }`) for expected failures instead of throwing. Show errors in the form or as a toast.
+- Call `revalidatePath` after a write so server-rendered pages refresh.
+- Write through `getDb()` from `@/lib/db`. Turn an empty optional string into `null` before inserting.
+
+**Client forms**
+- Use `react-hook-form` with `zodResolver(schema)` from `@hookform/resolvers/zod`. Mark the file `"use client"`.
+- Build fields with the shadcn `Field`, `FieldLabel`, `FieldError` and `FieldGroup` primitives. Wrap each input in `Controller` and spread `field` onto it. Set `data-invalid` on `Field` and `aria-invalid` on the input from `fieldState.invalid`, and give each input an `id` that matches its label's `htmlFor`.
+- Follow the shadcn skill and `.agents/skills/shadcn/rules/forms.md`. Use the project's existing components (`Input`, `Textarea`, `ToggleGroup`, `Item`, `Spinner`, `Dialog`) and a `Button` with `data-icon="inline-start"` on its icon. Check `components/ui/` before adding anything.
+- Read form values for display with `useWatch`, not `watch`. Set values programmatically with `setValue(name, value, { shouldDirty: true, shouldValidate: formState.isSubmitted })`.
+- Reset the form with fresh defaults each time a dialog opens (`reset(...)` in `onOpenChange`), so no stale text or old seed carries over.
+- Disable the submit button while `formState.isSubmitting` and show a `Spinner` in it. Report the outcome with `toast.add(...)` from `@/components/ui/toast`, and close the dialog on success only.
+- A shortcut that fills one field (a preset chip, a suggestion) must fill every field it implies. Check what the user sees afterwards: no half-filled form. Toggling a preset off clears only the field it controls.
+- Placeholders show an example value from the design. They are not default values.
+- Random values the user can reroll (like the avatar seed) live in a form field, generated with `nanoid()`. They are validated for length only.
+
+**Checks before calling a form done**
+- `npm run typecheck`, `npm run lint -- <changed files>`, and `npm run build` all pass.
+- Open the form in the running app while signed in and exercise it: empty submit shows every error, a valid submit creates the row, cancel and reopen starts clean. Say plainly if you could not do this.
 
 ## DiceBear
 
