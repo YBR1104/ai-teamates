@@ -1,42 +1,29 @@
-import {
-  boolean,
-  index,
-  pgTable,
-  text,
-  timestamp,
-  uuid,
-} from "drizzle-orm/pg-core"
+import { index, pgTable, text, timestamp } from "drizzle-orm/pg-core"
+import { nanoid } from "nanoid"
 
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  clerkId: text("clerk_id").notNull().unique(),
-  email: text("email"),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-})
-
-export type User = typeof users.$inferSelect
-export type NewUser = typeof users.$inferInsert
-
-export const todos = pgTable(
-  "todos",
+export const bots = pgTable(
+  "bots",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
-    // Clerk user id (owner of the todo)
+    id: text("id").primaryKey().$defaultFn(() => nanoid()),
+    // Third-party (Clerk) user id of the owner
     userId: text("user_id").notNull(),
-    title: text("title").notNull(),
-    completed: boolean("completed").notNull().default(false),
+    name: text("name").notNull(),
+    // Seed for the bot's face
+    avatar: text("avatar")
+      .notNull()
+      .$defaultFn(() => nanoid()),
+    // What the bot is for, in a phrase
+    job: text("job").notNull(),
+    // How it should go about the job
+    instructions: text("instructions"),
+    // Third-party sandbox id, created lazily later
+    sandboxId: text("sandbox_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true })
-      .notNull()
-      .defaultNow()
-      .$onUpdate(() => new Date()),
   },
-  (table) => [index("todos_user_id_idx").on(table.userId)]
+  (table) => [index("bots_user_id_idx").on(table.userId)]
 )
 
-export type Todo = typeof todos.$inferSelect
-export type NewTodo = typeof todos.$inferInsert
+export type Bot = typeof bots.$inferSelect
+export type NewBot = typeof bots.$inferInsert
